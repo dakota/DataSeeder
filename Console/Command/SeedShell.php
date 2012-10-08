@@ -19,7 +19,7 @@ define('NL', "\n");
  *
  * @author        Julius Ehrlich (julius@ehrlich-bros.de)
  * @copyright     Copyright 2012, Ehrlich Bros. (http://ehrlich-bros.de)
- * @link          TBD
+ * @link          https://github.com/jlis/Cake-Seed-Shell
  * @package       app.Plugin.Shell
  * @license       MIT License (http://www.opensource.org/licenses/mit-license.php)
  */

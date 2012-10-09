@@ -11,9 +11,9 @@ It is still being developed and new features will continue to be added.
 
 **Step 1:** Copy folders "Config" and "Console" into your "app" Folder
 
-**Step 2:** Go to 'Config/Seeds' folder in your app and add/remove/customize seed files as you like
+**Step 2:** Go to `Config/Seeds` folder in your app and add/remove/customize seed files as you like
 
-**Step 3:** Open shell and run cake command ```cake seed```
+**Step 3:** Open shell and run cake command ```./cake seed```
 
 **Step 4:** Follow instructions
 
@@ -28,6 +28,12 @@ Please report issues on the project’s [GitHub Issues](https://github.com/jlis/
 **Comments/Suggestions**
 
 If you would like to leave some general feedback, please leave me a mail (julius [at] ehrlich-bros [dot] de) or write me on skype (raiiid).
+
+
+##Known bugs##
+* * *
+
+- Can't get it working under Windows, will fix this
 
 
 ##Changelog##

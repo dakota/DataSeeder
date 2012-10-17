@@ -28,13 +28,15 @@ class SeedShell extends AppShell {
   private $seeds_path, $tmp_path, $seed;
 
   function main() {
-    $this->welcome();
     $this->initialize();
   }
 
   function initialize() {
     // set console style
     $this->stdout->styles('success', array('text' => 'green', 'blink' => false));
+
+    // show welcome message
+    $this->welcome();
 
     // set seeds path
     if (empty($this->seeds_path)) {

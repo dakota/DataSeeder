@@ -1,0 +1,13 @@
+{
+    "name": "dakota/data-seeder",
+	"type": "cakephp-plugin",
+    "authors": [
+        {
+            "name": "Walther Lalk",
+            "email": "emailme@waltherlalk.com"
+        }
+    ],
+    "require": {
+	    "fzaninotto/faker": "~1.3"
+    }
+}

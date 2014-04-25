@@ -200,7 +200,7 @@ class SeedShell extends AppShell {
 
 			$log = '';
 			if (method_exists($Seed, 'generate')) {
-				$Seed->generate();
+				$Seed->data = $Seed->generate();
 				$log .= '+ Seed data generated' . PHP_EOL;
 			}
 

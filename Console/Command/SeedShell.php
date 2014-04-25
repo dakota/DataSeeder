@@ -3,10 +3,7 @@
 // Components used
 App::uses('Folder', 'Utility');
 App::uses('File', 'Utility');
-
-// Some helping constants
-define('LS', '---------------------------------------------------------------');
-define('NL', "\n");
+App::uses('AppShell', 'Console/Command');
 
 /**
  * Seed Shell
@@ -25,176 +22,313 @@ define('NL', "\n");
  */
 class SeedShell extends AppShell {
 
-  private $seeds_path, $tmp_path, $seed;
+/**
+ * Current path to load and save seed files
+ *
+ * @var string
+ */
+	public $path = null;
 
-  function main() {
-    $this->initialize();
-  }
+/**
+ * Connection used for the migration_schema table of the migration versions
+ *
+ * @var null|string
+ */
+	public $connection = null;
 
-  function initialize() {
-    // set console style
-    $this->stdout->styles('success', array('text' => 'green', 'blink' => false));
+/**
+ * Type of seed, can be 'app' or a plugin name
+ *
+ * @var string
+ */
+	public $type = 'app';
 
-    // show welcome message
-    $this->welcome();
+/**
+ * Seed to run
+ *
+ * @var null|string
+ */
+	public $seed = null;
 
-    // set seeds path
-    if (empty($this->seeds_path)) {
-      $this->seeds_path = APP . 'Config' . DS . 'Seeds' . DS;
-    }
-    //$this->out('Seeds path set to:' . NL . $this->seeds_path . NL . LS);
+	public function startup() {
+		$this->out(__d('data_seed', 'Cake Database Seeder Shell'));
+		$this->hr();
 
-    // list available seeds
-    $seeds = $this->get_seeds();
-    if (count($seeds) > 0) {
-      $this->out('Following seeds are available, which one would you like to load?');
+		if (!empty($this->params['connection'])) {
+			$this->connection = $this->params['connection'];
+		}
 
-      // make prompt
-      $prompt = '';
-      foreach ($seeds as $k => $s) {
-        $prompt.= '[' . $k . '] ' . $s . NL;
-      }
+		if (!empty($this->params['plugin'])) {
+			$this->type = $this->params['plugin'];
+		}
 
-      // set additional prompt options
-      $additonal_promt_options = array(
-        'P' => '[P] Set custom path for seed files',
-        'Q' => '[Q] Quit'
-      );
-      foreach ($additonal_promt_options as $option) {
-        $prompt.= $option . NL;
-      }
+		if (!empty($this->params['seed'])) {
+			$this->seed = $this->params['seed'];
+		}
 
-      // setup prompt
-      $prompt_keys = array_merge(array_keys($seeds), array_keys($additonal_promt_options));
-      $result = strtolower($this->in($prompt, $prompt_keys, 'Q'));
-      
-      // check prompt result
-      if (strtolower($result) == 'q') {
-        // quit
-        return $this->_stop();
-      } elseif (strtolower($result) == 'p') {
-        // set new seed path
-        $prompt = 'Please provide path to seed files';
-        $result = strtolower($this->in($prompt));
+		$this->path = $this->_getPath() . 'Config' . DS . 'Seeds' . DS;
+	}
 
-        // set new seed path
-        if (empty($result) || !is_dir($result) || !is_readable($result)) {
-          $this->error('The path provided is invalid or could not be read.');
-          return $this->_stop();
-        } else {
-          $this->seeds_path = $result;
-          $this->info('Seeds path set to:' . NL . $this->seeds_path . NL . LS);
-        }
-      } elseif(!is_numeric($result)) {
-        $this->error('The option you choosed is inavlid. Please try again.');
-        return $this->_stop();
-      }
-      else {
-        // set target seed
-        $seed_key = (int)$result;
-        if (isset($seeds[$seed_key])) {
-          $this->seed = $seeds[$seed_key];
-          $this->run();
-        } else {
-          $this->error('The choosen option could not be found: ' . $seed_key);
-          return $this->_stop();
-        }
-      }
-    } else {
-      $this->info('No seeds available.');
-    }
-  }
+	/**
+	 * Get the option parser.
+	 *
+	 * @return
+	 */
+	public function getOptionParser() {
+		$parser = parent::getOptionParser();
 
-  function get_seeds() {
-    $dir = new Folder($this->seeds_path);
-    $files = $dir->find('(.*)Seed\.php');
-    $seeds = array();
+		return $parser->description('The database seed shell.')
+			->addOption('plugin', array(
+				'short' => 'p',
+				'help' => __('Plugin name to be used')))
+			->addOption('connection', array(
+				'short' => 'c',
+				'default' => null,
+				'help' => __('Overrides the \'default\' connection')))
+			->addOption('seed', array(
+				'short' => 's',
+				'default' => null,
+				'help' => __('Specify the seed file to run')))
+			->addSubcommand('seed', array(
+			'help' => __('Seeds the database')))
+			->addSubcommand('generate', array(
+			'help' => __('Generates a empty seed file.')));
+	}
 
-    foreach ($files as $file) {
-      $seeds[] = reset(explode('.', $file));
-    }
-    sort($seeds);
+	public function main() {
+		$this->out($this->getOptionParser()->help());
+	}
 
-    return $seeds;
-  }
+/**
+ * Return the path used
+ *
+ * @param string $type Can be 'app' or a plugin name
+ *
+ * @return string Path used
+ */
+	protected function _getPath($type = null) {
+		if ($type === null) {
+			$type = $this->type;
+		}
+		if ($type !== 'app') {
+			return App::pluginPath($type);
+		}
 
-  function run() {
-    $this->out('Please choose one of the following options');
-    $prompt = '[1] Write new seed data' . NL . '[2] Remove old seed data' . NL . '[3] Both (option 2 + 1)' . NL;
-    $seed_option = strtolower($this->in($prompt, array('1', '2', '3'), '3'));
+		return APP;
+	}
 
-    // set seed filename
-    $seed_file = $this->seeds_path . $this->seed . '.php';
+	public function generate() {
+		while (true) {
+			$name = $this->in(__d('data_seed', 'Please enter the descriptive name of the seed to generate:'));
+			if (!preg_match('/^([A-Za-z0-9_]+|\s)+$/', $name) || is_numeric($name[0])) {
+				$this->out('');
+				$this->err(__d('data_seed', 'Seed name (%s) is invalid. It must only contain alphanumeric characters and start with a letter.', $name));
+			} elseif (strlen($name) > 255) {
+				$this->out('');
+				$this->err(__d('data_seed', 'Seed name (%s) is invalid. It cannot be longer than 255 characters.', $name));
+			} else {
+				$name = str_replace(' ', '_', trim($name));
+				break;
+			}
+		}
+		$this->out(__d('data_seed', 'Generating an empty seed file...'));
+		$this->_writeSeed($name);
+		$this->out('');
+		$this->out(__d('data_seed', 'Done.'));
+	}
 
-    // disable cache
-    $cache_disable = Configure::read('Cache.disable');
-    Configure::write('Cache.disable', true);
+	protected function _writeSeed($name) {
+		$content = $this->_generateEmptySeed($name, Inflector::camelize($name));
+		$File = new File($this->path . Inflector::camelize($name) . 'Seed.php', true);
 
-    if (file_exists($seed_file) && is_readable($seed_file))
-    {
-      // load file and set class
-      require_once $seed_file;
-      $class = $this->seed;
+		return $File->write($content);
+	}
 
-      if (!class_exists($class)) {
-        $this->error('Unable to find class ' . $class . ' in seed file ' . $seed_file);
-        return $this->_stop();
-      }
+	protected function _generateEmptySeed($name, $class) {
+		return $this->_generateTemplate('seed', compact('name', 'class'));
+	}
 
-      // initialize class and load needed models
-      $Seed = new $class;
-      if (is_array($Seed->uses) && count($Seed->uses) > 0) {
-        foreach ($Seed->uses as $model) {
-          App::import('Model', $model);
-          $Seed->$model = new $model();
-        }
-      }
+/**
+ * Include and generate a template string based on a template file
+ *
+ * @param string $template Template file name
+ * @param array  $vars     List of variables to be used on tempalte
+ *
+ * @return string
+ */
+	protected function _generateTemplate($template, $vars) {
+		extract($vars);
+		ob_start();
+		ob_implicit_flush(0);
+		include dirname(__FILE__) . DS . 'Templates' . DS . $template . '.ctp';
+		$content = ob_get_clean();
 
-      $log = '';
-      // run down method to remove previous seed data
-      if (method_exists($Seed, 'down') && ($seed_option == '2' || $seed_option == '3')) {
-        $Seed->down();
-        $log.= '+ Previous seed data removed' . NL;
-      }
+		return $content;
+	}
 
-      // inset new seed data
-      if (method_exists($Seed, 'up') && ($seed_option == '1' || $seed_option == '3')) {
-        $Seed->up();
-        $log.= '+ New seed data written' . NL;
-      }
+	public function seed() {
+		if (empty($this->seed)) {
+			$this->seed = $this->_getSeed();
+		}
 
-      $this->success($class . NL . $log);
+		$this->out('Please choose one of the following options');
+		$prompt = '[1] Write new seed data' . PHP_EOL . '[2] Remove old seed data' . PHP_EOL . '[3] Both (option 2 + 1)' . PHP_EOL;
+		$seedType = strtolower($this->in($prompt, array('1', '2', '3'), '3'));
 
-      // stop executing
-      return $this->_stop();
-    }
-    else {
-      $this->error('Unable to read seed file under:' . NL . $seed_file);
-      return $this->_stop();
-    }
+		// set seed filename
+		$seedFile = $this->path . $this->seed . '.php';
 
-    // reenable cache
-    Configure::write('Cache.disable', $cache_disable);
-  }
+		if (file_exists($seedFile) && is_readable($seedFile)) {
+			// load file and set class
+			require_once $seedFile;
+			$class = $this->seed;
 
-  function error($message) {
-    $this->out('<error>ERROR (' . date('Y-m-d H:i:s') . '):</error>' . NL . '<warning>' . $message . '</warning>' . NL . LS);
-  }
+			if (!class_exists($class)) {
+				$this->error('Unable to find class ' . $class . ' in seed file ' . $seedFile);
 
-  function info($message) {
-    $this->out('<info>INFO (' . date('Y-m-d H:i:s') . '):</info>' . NL . '<warning>' . $message . '</warning>' . NL . LS);
-  }
+				return $this->_stop();
+			}
 
-  function success($message) {
-    $this->out(LS . NL . '<success>SUCCESS (' . date('Y-m-d H:i:s') . '):</success>' . NL . '<warning>' . $message . '</warning>' . LS);
-  }
+			// initialize class and load needed models
+			$Seed = new $class;
+			if (is_array($Seed->uses) && count($Seed->uses) > 0) {
+				foreach ($Seed->uses as $model) {
+					App::import('Model', $model);
+					$Seed->$model = new $model(false, null, $this->connection);
+				}
+			}
 
-  function welcome() {
-    $line = ' _____           _ _____ _       _ _ #|   __|___ ___ _| |   __| |_ ___| | |#|__   | -_| -_| . |__   |   | -_| | |#|_____|___|___|___|_____|_|_|___|_|_|#Version 0.1, by Ehrlich Bros. (www.ehrlich-bros.de)';
-    $lines = explode('#', $line);
-    $this->out(implode(NL, $lines) . NL . LS . NL);
-  }
+			$log = '';
+			if (method_exists($Seed, 'generate')) {
+				$Seed->generate();
+				$log .= '+ Seed data generated' . PHP_EOL;
+			}
 
+			// run down method to remove previous seed data
+			if (method_exists($Seed, 'down') && ($seedType == '2' || $seedType == '3')) {
+				$Seed->down();
+				$log .= '+ Previous seed data removed' . PHP_EOL;
+			}
+
+			// inset new seed data
+			if (method_exists($Seed, 'up') && ($seedType == '1' || $seedType == '3')) {
+				$Seed->up();
+				$log .= '+ New seed data written' . PHP_EOL;
+			}
+
+			$this->out($class . PHP_EOL . $log);
+
+			// stop executing
+			return $this->_stop();
+		} else {
+			$this->error('Unable to read seed file under:' . PHP_EOL . $seedFile);
+
+			return $this->_stop();
+		}
+	}
+
+	protected function _getSeed() {
+		$availableSeeds = $this->_getAvailableSeeds();
+		if (count($availableSeeds) > 0) {
+			$this->out('Following seeds are available, which one would you like to load?');
+
+			$prompt = array();
+			foreach ($availableSeeds as $key => $seed) {
+				$prompt[$key] = '[' . $key . '] ' . $seed;
+			}
+
+			$prompt['q'] = '[Q] Quit';
+
+			$seedToUse = strtolower($this->in(implode(PHP_EOL, $prompt), null, 'Q'));
+
+			if ($seedToUse == 'q') {
+				return $this->_stop();
+			} elseif (!is_numeric($seedToUse)) {
+				$this->error('The option you choose is invalid. Please try again.');
+
+				return $this->_stop();
+			} else {
+				$seedKey = (int)$seedToUse;
+				if (isset($availableSeeds[$seedKey])) {
+					return $availableSeeds[$seedKey];
+				} else {
+					$this->error('The choosen option could not be found: ' . $seedKey);
+
+					return $this->_stop();
+				}
+			}
+		}
+	}
+
+	protected function _getAvailableSeeds() {
+		$dir = new Folder($this->path);
+		$files = $dir->find('(.*)Seed\.php');
+		$seeds = array();
+
+		foreach ($files as $file) {
+			$seeds[] = reset(explode('.', $file));
+		}
+		sort($seeds);
+
+		return $seeds;
+	}
+
+	function run() {
+		$this->out('Please choose one of the following options');
+		$prompt = '[1] Write new seed data' . NL . '[2] Remove old seed data' . NL . '[3] Both (option 2 + 1)' . NL;
+		$seed_option = strtolower($this->in($prompt, array('1', '2', '3'), '3'));
+
+		// set seed filename
+		$seed_file = $this->seeds_path . $this->seed . '.php';
+
+		// disable cache
+		$cache_disable = Configure::read('Cache.disable');
+		Configure::write('Cache.disable', true);
+
+		if (file_exists($seed_file) && is_readable($seed_file)) {
+			// load file and set class
+			require_once $seed_file;
+			$class = $this->seed;
+
+			if (!class_exists($class)) {
+				$this->error('Unable to find class ' . $class . ' in seed file ' . $seed_file);
+
+				return $this->_stop();
+			}
+
+			// initialize class and load needed models
+			$Seed = new $class;
+			if (is_array($Seed->uses) && count($Seed->uses) > 0) {
+				foreach ($Seed->uses as $model) {
+					App::import('Model', $model);
+					$Seed->$model = new $model();
+				}
+			}
+
+			$log = '';
+			// run down method to remove previous seed data
+			if (method_exists($Seed, 'down') && ($seed_option == '2' || $seed_option == '3')) {
+				$Seed->down();
+				$log .= '+ Previous seed data removed' . NL;
+			}
+
+			// inset new seed data
+			if (method_exists($Seed, 'up') && ($seed_option == '1' || $seed_option == '3')) {
+				$Seed->up();
+				$log .= '+ New seed data written' . NL;
+			}
+
+			$this->success($class . NL . $log);
+
+			// stop executing
+			return $this->_stop();
+		} else {
+			$this->error('Unable to read seed file under:' . NL . $seed_file);
+
+			return $this->_stop();
+		}
+
+		// reenable cache
+		Configure::write('Cache.disable', $cache_disable);
+	}
 }
-
-?>

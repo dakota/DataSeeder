@@ -194,7 +194,7 @@ class SeedShell extends AppShell {
 			$prompt = '[1] Write new seed data' . PHP_EOL . '[2] Remove old seed data' . PHP_EOL . '[3] Both (option 2 + 1)' . PHP_EOL;
 			$seedType = strtolower($this->in($prompt, array('1', '2', '3'), '3'));
 		} else {
-			$seedType = $this->type == 'both' ? 3 : $this->type == 'up' ? 1 : 2;
+			$seedType = $this->type == 'both' ? '3' : ($this->type == 'up' ? '1' : '2');
 		}
 
 		// set seed filename

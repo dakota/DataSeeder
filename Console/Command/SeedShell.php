@@ -180,6 +180,7 @@ class SeedShell extends AppShell {
 
 		if (file_exists($seedFile) && is_readable($seedFile)) {
 			// load file and set class
+			App::uses('CakeSeed', 'DataSeeder.Lib');
 			require_once $seedFile;
 			$class = $this->seed;
 
@@ -190,20 +191,12 @@ class SeedShell extends AppShell {
 			}
 
 			// initialize class and load needed models
-			$Seed = new $class;
-			if (is_array($Seed->uses) && count($Seed->uses) > 0) {
-				foreach ($Seed->uses as $model) {
-					App::import('Model', $model);
-					$Seed->$model = new $model(false, null, $this->connection);
-				}
-			}
+			$Seed = new $class(array(
+				'connection' => $this->connection,
+				'callback' => &$this
+			));
 
 			$log = '';
-			if (method_exists($Seed, 'generate')) {
-				$Seed->data = $Seed->generate();
-				$log .= '+ Seed data generated' . PHP_EOL;
-			}
-
 			// run down method to remove previous seed data
 			if (method_exists($Seed, 'down') && ($seedType == '2' || $seedType == '3')) {
 				$Seed->down();

@@ -37,11 +37,18 @@ class SeedShell extends AppShell {
 	public $connection = null;
 
 /**
- * Type of seed, can be 'app' or a plugin name
+ * Source of the seed, can be 'app' or a plugin name
  *
  * @var string
  */
-	public $type = 'app';
+	public $source = 'app';
+
+/**
+ * Type of seed
+ *
+ * @var null|string
+ */
+	public $type = null;
 
 /**
  * Seed to run
@@ -59,11 +66,15 @@ class SeedShell extends AppShell {
 		}
 
 		if (!empty($this->params['plugin'])) {
-			$this->type = $this->params['plugin'];
+			$this->source = $this->params['plugin'];
 		}
 
 		if (!empty($this->params['seed'])) {
 			$this->seed = $this->params['seed'];
+		}
+
+		if (!empty($this->params['type'])) {
+			$this->type = $this->params['type'];
 		}
 
 		$this->path = $this->_getPath() . 'Config' . DS . 'Seeds' . DS;
@@ -89,6 +100,11 @@ class SeedShell extends AppShell {
 				'short' => 's',
 				'default' => null,
 				'help' => __('Specify the seed file to run')))
+			->addOption('type', array(
+				'short' => 't',
+				'default' => null,
+				'choices' => array('up', 'down', 'both'),
+				'help' => __('Specify the type of seed')))
 			->addSubcommand('seed', array(
 			'help' => __('Seeds the database')))
 			->addSubcommand('generate', array(
@@ -108,7 +124,7 @@ class SeedShell extends AppShell {
  */
 	protected function _getPath($type = null) {
 		if ($type === null) {
-			$type = $this->type;
+			$type = $this->source;
 		}
 		if ($type !== 'app') {
 			return App::pluginPath($type);
@@ -169,11 +185,17 @@ class SeedShell extends AppShell {
 	public function seed() {
 		if (empty($this->seed)) {
 			$this->seed = $this->_getSeed();
+		} else {
+			$this->seed .= 'Seed';
 		}
 
-		$this->out('Please choose one of the following options');
-		$prompt = '[1] Write new seed data' . PHP_EOL . '[2] Remove old seed data' . PHP_EOL . '[3] Both (option 2 + 1)' . PHP_EOL;
-		$seedType = strtolower($this->in($prompt, array('1', '2', '3'), '3'));
+		if (empty($this->type)) {
+			$this->out('Please choose one of the following options');
+			$prompt = '[1] Write new seed data' . PHP_EOL . '[2] Remove old seed data' . PHP_EOL . '[3] Both (option 2 + 1)' . PHP_EOL;
+			$seedType = strtolower($this->in($prompt, array('1', '2', '3'), '3'));
+		} else {
+			$seedType = $this->type == 'both' ? 3 : $this->type == 'up' ? 1 : 2;
+		}
 
 		// set seed filename
 		$seedFile = $this->path . $this->seed . '.php';

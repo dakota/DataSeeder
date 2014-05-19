@@ -1,9 +1,12 @@
 <?php
+namespace DataSeeder\Console\Command;
 
 // Components used
-App::uses('Folder', 'Utility');
-App::uses('File', 'Utility');
-App::uses('AppShell', 'Console/Command');
+use Cake\Console\Shell;
+use Cake\Core\App;
+use Cake\Core\Configure;
+use Cake\Utility\Folder;
+use Cake\Utility\Inflector;
 
 /**
  * Seed Shell
@@ -20,7 +23,7 @@ App::uses('AppShell', 'Console/Command');
  * @package       app.Plugin.Shell
  * @license       MIT License (http://www.opensource.org/licenses/mit-license.php)
  */
-class SeedShell extends AppShell {
+class SeedShell extends Shell {
 
 /**
  * Current path to load and save seed files
@@ -80,7 +83,7 @@ class SeedShell extends AppShell {
 		$this->path = $this->_getPath() . 'Config' . DS . 'Seeds' . DS;
 	}
 
-	/**
+/**
 	 * Get the option parser.
 	 *
 	 * @return
@@ -134,6 +137,7 @@ class SeedShell extends AppShell {
 	}
 
 	public function generate() {
+		$name = '';
 		while (true) {
 			$name = $this->in(__d('data_seed', 'Please enter the descriptive name of the seed to generate:'));
 			if (!preg_match('/^([A-Za-z0-9_]+|\s)+$/', $name) || is_numeric($name[0])) {
@@ -198,22 +202,11 @@ class SeedShell extends AppShell {
 		}
 
 		// set seed filename
-		$seedFile = $this->path . $this->seed . '.php';
+		$seedClass = Configure::read('App.namespace') . '\Config\Seeds\\' . $this->seed;
 
-		if (file_exists($seedFile) && is_readable($seedFile)) {
-			// load file and set class
-			App::uses('CakeSeed', 'DataSeeder.Lib');
-			require_once $seedFile;
-			$class = $this->seed;
-
-			if (!class_exists($class)) {
-				$this->error('Unable to find class ' . $class . ' in seed file ' . $seedFile);
-
-				return $this->_stop();
-			}
-
+		if (class_exists($seedClass)) {
 			// initialize class and load needed models
-			$Seed = new $class(array(
+			$Seed = new $seedClass(array(
 				'connection' => $this->connection,
 				'callback' => &$this
 			));
@@ -231,14 +224,14 @@ class SeedShell extends AppShell {
 				$log .= '+ New seed data written' . PHP_EOL;
 			}
 
-			$this->out($class . PHP_EOL . $log);
+			$this->out($seedClass . PHP_EOL . $log);
 
 			// stop executing
-			return $this->_stop();
+			$this->_stop();
 		} else {
-			$this->error('Unable to read seed file under:' . PHP_EOL . $seedFile);
+			$this->error('Unable to find class ' . $seedClass);
 
-			return $this->_stop();
+			$this->_stop();
 		}
 	}
 
@@ -257,19 +250,19 @@ class SeedShell extends AppShell {
 			$seedToUse = strtolower($this->in(implode(PHP_EOL, $prompt), null, 'Q'));
 
 			if ($seedToUse == 'q') {
-				return $this->_stop();
+				$this->_stop();
 			} elseif (!is_numeric($seedToUse)) {
 				$this->error('The option you choose is invalid. Please try again.');
 
-				return $this->_stop();
+				$this->_stop();
 			} else {
 				$seedKey = (int)$seedToUse;
 				if (isset($availableSeeds[$seedKey])) {
 					return $availableSeeds[$seedKey];
 				} else {
-					$this->error('The choosen option could not be found: ' . $seedKey);
+					$this->error('The chosen option could not be found: ' . $seedKey);
 
-					return $this->_stop();
+					$this->_stop();
 				}
 			}
 		}
@@ -281,7 +274,8 @@ class SeedShell extends AppShell {
 		$seeds = array();
 
 		foreach ($files as $file) {
-			$seeds[] = reset(explode('.', $file));
+			$file = explode('.', $file);
+			$seeds[] = reset($file);
 		}
 		sort($seeds);
 

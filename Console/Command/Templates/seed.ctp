@@ -1,5 +1,10 @@
 <?php
+use Cake\Core\Configure;
+
 echo "<?php\n";
+echo 'namespace ' . Configure::read('App.namespace') . "\\Config\\Seed;\n";
+echo "\n";
+echo "use DataSeeder\\Lib\\CakeSeed";
 ?>
 /**
 * Seed class <?php echo $class; ?>Seed

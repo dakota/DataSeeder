@@ -1,8 +1,14 @@
 <?php
+namespace DataSeeder\Lib;
+use Cake\Model\ModelAwareTrait;
+use Cake\ORM\Table;
+
 /**
  * Class CakeSeed
  */
-class CakeSeed extends Object {
+class CakeSeed {
+
+	use ModelAwareTrait;
 
 /**
  * Connection used
@@ -11,13 +17,20 @@ class CakeSeed extends Object {
  */
 	public $connection = 'default';
 
+	public $uses = array();
+
+/**
+ * @var \Cake\Console\Shell
+ */
+	public $callback;
+
 /**
  * Constructor
  *
  * @param array $options optional load object properties
  */
 	public function __construct($options = array()) {
-		parent::__construct();
+		$this->modelFactory('Table', ['Cake\ORM\TableRegistry', 'get']);
 
 		$allowed = array('connection', 'callback');
 
@@ -29,9 +42,24 @@ class CakeSeed extends Object {
 
 		if (is_array($this->uses) && count($this->uses) > 0) {
 			foreach ($this->uses as $model) {
-				App::import('Model', $model);
-				$this->$model = new $model(false, null, $this->connection);
+				$this->loadModel($model);
 			}
+		}
+	}
+
+/**
+ * Truncate a table
+ *
+ * @param \Cake\ORM\Table $table
+ *
+ * @return void
+ */
+	public function truncateTable(Table $table) {
+		$connection = $table->connection();
+		$schemaTable = new \Cake\Database\Schema\Table($table->table());
+		$sql = $schemaTable->truncateSql($connection);
+		foreach ($sql as $stmt) {
+			$connection->execute($stmt)->closeCursor();
 		}
 	}
 } 

@@ -225,9 +225,6 @@ class SeedShell extends Shell {
 			}
 
 			$this->out($seedClass . PHP_EOL . $log);
-
-			// stop executing
-			$this->_stop();
 		} else {
 			$this->error('Unable to find class ' . $seedClass);
 

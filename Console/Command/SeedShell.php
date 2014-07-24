@@ -92,26 +92,30 @@ class SeedShell extends Shell {
 		$parser = parent::getOptionParser();
 
 		return $parser->description('The database seed shell.')
-			->addOption('plugin', array(
+			->addOption('plugin', [
 				'short' => 'p',
-				'help' => __('Plugin name to be used')))
-			->addOption('connection', array(
+				'help' => __('Plugin name to be used')])
+			->addOption('connection', [
 				'short' => 'c',
 				'default' => null,
-				'help' => __('Overrides the \'default\' connection')))
-			->addOption('seed', array(
+				'help' => __('Overrides the \'default\' connection')])
+			->addOption('seed', [
 				'short' => 's',
 				'default' => null,
-				'help' => __('Specify the seed file to run')))
-			->addOption('type', array(
+				'help' => __('Specify the seed file to run')])
+			->addOption('type', [
 				'short' => 't',
 				'default' => null,
-				'choices' => array('up', 'down', 'both'),
-				'help' => __('Specify the type of seed')))
-			->addSubcommand('seed', array(
-			'help' => __('Seeds the database')))
-			->addSubcommand('generate', array(
-			'help' => __('Generates a empty seed file.')));
+				'choices' => ['up', 'down', 'both'],
+				'help' => __('Specify the type of seed')])
+			->addOption('count', [
+				'short' => 'n',
+				'default' => null,
+				'help' => __('Some seeds need a counter')])
+			->addSubcommand('seed', [
+				'help' => __('Seeds the database')])
+			->addSubcommand('generate', [
+			'help' => __('Generates a empty seed file.')]);
 	}
 
 	public function main() {
@@ -196,7 +200,7 @@ class SeedShell extends Shell {
 		if (empty($this->type)) {
 			$this->out('Please choose one of the following options');
 			$prompt = '[1] Write new seed data' . PHP_EOL . '[2] Remove old seed data' . PHP_EOL . '[3] Both (option 2 + 1)' . PHP_EOL;
-			$seedType = strtolower($this->in($prompt, array('1', '2', '3'), '3'));
+			$seedType = strtolower($this->in($prompt, ['1', '2', '3'], '3'));
 		} else {
 			$seedType = $this->type == 'both' ? '3' : ($this->type == 'up' ? '1' : '2');
 		}
@@ -206,10 +210,10 @@ class SeedShell extends Shell {
 
 		if (class_exists($seedClass)) {
 			// initialize class and load needed models
-			$Seed = new $seedClass(array(
+			$Seed = new $seedClass([
 				'connection' => $this->connection,
 				'callback' => &$this
-			));
+			]);
 
 			$log = '';
 			// run down method to remove previous seed data
@@ -237,7 +241,7 @@ class SeedShell extends Shell {
 		if (count($availableSeeds) > 0) {
 			$this->out('Following seeds are available, which one would you like to load?');
 
-			$prompt = array();
+			$prompt = [];
 			foreach ($availableSeeds as $key => $seed) {
 				$prompt[$key] = '[' . $key . '] ' . $seed;
 			}
@@ -268,7 +272,7 @@ class SeedShell extends Shell {
 	protected function _getAvailableSeeds() {
 		$dir = new Folder($this->path);
 		$files = $dir->find('(.*)Seed\.php');
-		$seeds = array();
+		$seeds = [];
 
 		foreach ($files as $file) {
 			$file = explode('.', $file);

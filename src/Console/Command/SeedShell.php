@@ -80,7 +80,7 @@ class SeedShell extends Shell {
 			$this->type = $this->params['type'];
 		}
 
-		$this->path = $this->_getPath() . 'Config' . DS . 'Seeds' . DS;
+		$this->path = $this->_getPath() . 'Seeds' . DS;
 	}
 
 /**
@@ -206,7 +206,7 @@ class SeedShell extends Shell {
 		}
 
 		// set seed filename
-		$seedClass = Configure::read('App.namespace') . '\Config\Seeds\\' . $this->seed;
+		$seedClass = Configure::read('App.namespace') . '\Seeds\\' . $this->seed;
 
 		if (class_exists($seedClass)) {
 			// initialize class and load needed models

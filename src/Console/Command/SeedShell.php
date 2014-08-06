@@ -5,6 +5,9 @@ namespace DataSeeder\Console\Command;
 use Cake\Console\Shell;
 use Cake\Core\App;
 use Cake\Core\Configure;
+use Cake\Core\Plugin;
+use Cake\Datasource\ConnectionManager;
+use Cake\Utility\ConventionsTrait;
 use Cake\Utility\Folder;
 use Cake\Utility\Inflector;
 
@@ -25,261 +28,187 @@ use Cake\Utility\Inflector;
  */
 class SeedShell extends Shell {
 
-/**
- * Current path to load and save seed files
- *
- * @var string
- */
-	public $path = null;
+	use ConventionsTrait;
 
 /**
  * Connection used for the migration_schema table of the migration versions
  *
  * @var null|string
  */
-	public $connection = null;
+	public $connection = 'default';
 
 /**
- * Source of the seed, can be 'app' or a plugin name
+ * Start the shell
  *
- * @var string
+ * @return void
  */
-	public $source = 'app';
-
-/**
- * Type of seed
- *
- * @var null|string
- */
-	public $type = null;
-
-/**
- * Seed to run
- *
- * @var null|string
- */
-	public $seed = null;
-
 	public function startup() {
 		$this->out(__d('data_seed', 'Cake Database Seeder Shell'));
 		$this->hr();
 
-		if (!empty($this->params['connection'])) {
+		$task = $this->_camelize($this->command);
+		if (isset($this->{$task}) && !in_array($task, ['Project'])) {
+			if (isset($this->params['connection'])) {
+				$this->{$task}->connection = $this->params['connection'];
+			}
+		}
+		if (isset($this->params['connection'])) {
 			$this->connection = $this->params['connection'];
 		}
-
-		if (!empty($this->params['plugin'])) {
-			$this->source = $this->params['plugin'];
-		}
-
-		if (!empty($this->params['seed'])) {
-			$this->seed = $this->params['seed'];
-		}
-
-		if (!empty($this->params['type'])) {
-			$this->type = $this->params['type'];
-		}
-
-		$this->path = $this->_getPath() . 'Seeds' . DS;
 	}
 
 /**
-	 * Get the option parser.
-	 *
-	 * @return
-	 */
+ * Override main() to handle action
+ *
+ * @return void
+ */
+	public function main() {
+		$connections = ConnectionManager::configured();
+		if (empty($connections)) {
+			$this->out('Your database configuration was not found.');
+			$this->out('Add your database connection information to config/app.php.');
+
+			return false;
+		}
+		$this->out('The following commands can be used to run configured data seeders.');
+		$this->out('');
+		$this->out('<info>Available seeds:</info>');
+		$this->out('');
+		foreach ($this->tasks as $task) {
+			list(, $name) = pluginSplit($task);
+			$this->out('- ' . Inflector::underscore($name));
+		}
+		$this->out('');
+		$this->out('By using <info>Console/cake DataSeeder.seed [name]</info> you can invoke a specific seed task.');
+	}
+
+/**
+ * Locate the tasks bake will use.
+ *
+ * Scans the following paths for tasks that are subclasses of
+ * Cake\Console\Command\Task\BakeTask:
+ *
+ * - Cake/Console/Command/Task/
+ * - App/Console/Command/Task/
+ * - Console/Command/Task for each loaded plugin
+ *
+ * @return void
+ */
+	public function loadTasks() {
+		$tasks = [];
+		$tasks = $this->_findSeeds($tasks, APP, Configure::read('App.namespace'));
+		foreach (Plugin::loaded() as $plugin) {
+			$tasks = $this->_findSeeds(
+				$tasks,
+				Plugin::classPath($plugin),
+				Plugin::getNamespace($plugin),
+				$plugin
+			);
+		}
+		$this->tasks = array_keys($tasks);
+		$this->_taskMap = $tasks;
+		$this->taskNames = array_merge($this->taskNames, array_keys($this->_taskMap));
+	}
+
+/**
+ * Append matching seeds in $path to the $tasks array.
+ *
+ * @param array  $tasks     The task list to modify and return.
+ * @param string $path      The base path to look in.
+ * @param string $namespace The base namespace.
+ *
+ * @return array Updated tasks.
+ */
+	protected function _findSeeds($tasks, $path, $namespace) {
+		$path .= 'Seed';
+		if (!is_dir($path)) {
+			return $tasks;
+		}
+		$candidates = $this->_findClassFiles($path, $namespace);
+		$classes = $this->_findSeedClasses($candidates);
+		foreach ($classes as $class) {
+			list(, $name) = namespaceSplit($class);
+			$name = substr($name, 0, -4);
+			$tasks[$name] = [
+				'class' => $class,
+				'config' => []
+			];
+		}
+
+		return $tasks;
+	}
+
+/**
+ * Find task classes in a given path.
+ *
+ * @param string $path      The path to scan.
+ * @param string $namespace Namespace.
+ *
+ * @return array An array of files that may contain bake tasks.
+ */
+	protected function _findClassFiles($path, $namespace) {
+		$iterator = new \DirectoryIterator($path);
+		$candidates = [];
+		foreach ($iterator as $item) {
+			if ($item->isDot() || $item->isDir()) {
+				continue;
+			}
+			$name = $item->getBasename('.php');
+			$candidates[] = $namespace . '\Seed\\' . $name;
+		}
+
+		return $candidates;
+	}
+
+/**
+ * Find bake tasks in a given set of files.
+ *
+ * @param array $files The array of files.
+ *
+ * @return array An array of matching classes.
+ */
+	protected function _findSeedClasses($files) {
+		$classes = [];
+		foreach ($files as $className) {
+			if (!class_exists($className)) {
+				continue;
+			}
+			$reflect = new \ReflectionClass($className);
+			if (!$reflect->isInstantiable()) {
+				continue;
+			}
+			if (!$reflect->isSubclassOf('DataSeeder\Seed\BaseSeed')) {
+				continue;
+			}
+			$classes[] = $className;
+		}
+
+		return $classes;
+	}
+
+/**
+ * Get the option parser.
+ *
+ * @return \Cake\Console\ConsoleOptionParser
+ */
 	public function getOptionParser() {
 		$parser = parent::getOptionParser();
 
-		return $parser->description('The database seed shell.')
-			->addOption('plugin', [
-				'short' => 'p',
-				'help' => __('Plugin name to be used')])
+		$parser
+			->description('The database seed shell.')
 			->addOption('connection', [
 				'short' => 'c',
 				'default' => null,
-				'help' => __('Overrides the \'default\' connection')])
-			->addOption('seed', [
-				'short' => 's',
-				'default' => null,
-				'help' => __('Specify the seed file to run')])
-			->addOption('type', [
-				'short' => 't',
-				'default' => null,
-				'choices' => ['up', 'down', 'both'],
-				'help' => __('Specify the type of seed')])
-			->addOption('count', [
-				'short' => 'n',
-				'default' => null,
-				'help' => __('Some seeds need a counter')])
-			->addSubcommand('seed', [
-				'help' => __('Seeds the database')])
-			->addSubcommand('generate', [
-			'help' => __('Generates a empty seed file.')]);
-	}
+				'help' => __('Overrides the \'default\' connection')]);
 
-	public function main() {
-		$this->out($this->getOptionParser()->help());
-	}
-
-/**
- * Return the path used
- *
- * @param string $type Can be 'app' or a plugin name
- *
- * @return string Path used
- */
-	protected function _getPath($type = null) {
-		if ($type === null) {
-			$type = $this->source;
-		}
-		if ($type !== 'app') {
-			return App::pluginPath($type);
-		}
-
-		return APP;
-	}
-
-	public function generate() {
-		$name = '';
-		while (true) {
-			$name = $this->in(__d('data_seed', 'Please enter the descriptive name of the seed to generate:'));
-			if (!preg_match('/^([A-Za-z0-9_]+|\s)+$/', $name) || is_numeric($name[0])) {
-				$this->out('');
-				$this->err(__d('data_seed', 'Seed name (%s) is invalid. It must only contain alphanumeric characters and start with a letter.', $name));
-			} elseif (strlen($name) > 255) {
-				$this->out('');
-				$this->err(__d('data_seed', 'Seed name (%s) is invalid. It cannot be longer than 255 characters.', $name));
-			} else {
-				$name = str_replace(' ', '_', trim($name));
-				break;
-			}
-		}
-		$this->out(__d('data_seed', 'Generating an empty seed file...'));
-		$this->_writeSeed($name);
-		$this->out('');
-		$this->out(__d('data_seed', 'Done.'));
-	}
-
-	protected function _writeSeed($name) {
-		$content = $this->_generateEmptySeed($name, Inflector::camelize($name));
-		$File = new File($this->path . Inflector::camelize($name) . 'Seed.php', true);
-
-		return $File->write($content);
-	}
-
-	protected function _generateEmptySeed($name, $class) {
-		return $this->_generateTemplate('seed', compact('name', 'class'));
-	}
-
-/**
- * Include and generate a template string based on a template file
- *
- * @param string $template Template file name
- * @param array  $vars     List of variables to be used on tempalte
- *
- * @return string
- */
-	protected function _generateTemplate($template, $vars) {
-		extract($vars);
-		ob_start();
-		ob_implicit_flush(0);
-		include dirname(__FILE__) . DS . 'Templates' . DS . $template . '.ctp';
-		$content = ob_get_clean();
-
-		return $content;
-	}
-
-	public function seed() {
-		if (empty($this->seed)) {
-			$this->seed = $this->_getSeed();
-		} else {
-			$this->seed .= 'Seed';
-		}
-
-		if (empty($this->type)) {
-			$this->out('Please choose one of the following options');
-			$prompt = '[1] Write new seed data' . PHP_EOL . '[2] Remove old seed data' . PHP_EOL . '[3] Both (option 2 + 1)' . PHP_EOL;
-			$seedType = strtolower($this->in($prompt, ['1', '2', '3'], '3'));
-		} else {
-			$seedType = $this->type == 'both' ? '3' : ($this->type == 'up' ? '1' : '2');
-		}
-
-		// set seed filename
-		$seedClass = Configure::read('App.namespace') . '\Seeds\\' . $this->seed;
-
-		if (class_exists($seedClass)) {
-			// initialize class and load needed models
-			$Seed = new $seedClass([
-				'connection' => $this->connection,
-				'callback' => &$this
+		foreach ($this->_taskMap as $task => $config) {
+			$taskParser = $this->{$task}->getOptionParser();
+			$parser->addSubcommand(Inflector::underscore($task), [
+				'help' => $taskParser->description(),
+				'parser' => $taskParser
 			]);
-
-			$log = '';
-			// run down method to remove previous seed data
-			if (method_exists($Seed, 'down') && ($seedType == '2' || $seedType == '3')) {
-				$Seed->down();
-				$log .= '+ Previous seed data removed' . PHP_EOL;
-			}
-
-			// inset new seed data
-			if (method_exists($Seed, 'up') && ($seedType == '1' || $seedType == '3')) {
-				$Seed->up();
-				$log .= '+ New seed data written' . PHP_EOL;
-			}
-
-			$this->out($seedClass . PHP_EOL . $log);
-		} else {
-			$this->error('Unable to find class ' . $seedClass);
-
-			$this->_stop();
 		}
-	}
 
-	protected function _getSeed() {
-		$availableSeeds = $this->_getAvailableSeeds();
-		if (count($availableSeeds) > 0) {
-			$this->out('Following seeds are available, which one would you like to load?');
-
-			$prompt = [];
-			foreach ($availableSeeds as $key => $seed) {
-				$prompt[$key] = '[' . $key . '] ' . $seed;
-			}
-
-			$prompt['q'] = '[Q] Quit';
-
-			$seedToUse = strtolower($this->in(implode(PHP_EOL, $prompt), null, 'Q'));
-
-			if ($seedToUse == 'q') {
-				$this->_stop();
-			} elseif (!is_numeric($seedToUse)) {
-				$this->error('The option you choose is invalid. Please try again.');
-
-				$this->_stop();
-			} else {
-				$seedKey = (int)$seedToUse;
-				if (isset($availableSeeds[$seedKey])) {
-					return $availableSeeds[$seedKey];
-				} else {
-					$this->error('The chosen option could not be found: ' . $seedKey);
-
-					$this->_stop();
-				}
-			}
-		}
-	}
-
-	protected function _getAvailableSeeds() {
-		$dir = new Folder($this->path);
-		$files = $dir->find('(.*)Seed\.php');
-		$seeds = [];
-
-		foreach ($files as $file) {
-			$file = explode('.', $file);
-			$seeds[] = reset($file);
-		}
-		sort($seeds);
-
-		return $seeds;
+		return $parser;
 	}
 }

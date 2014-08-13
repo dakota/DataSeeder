@@ -101,7 +101,7 @@ class SeedShell extends Shell {
 			$tasks = $this->_findSeeds(
 				$tasks,
 				Plugin::classPath($plugin),
-				Plugin::getNamespace($plugin),
+				$plugin,
 				$plugin
 			);
 		}

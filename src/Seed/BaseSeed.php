@@ -102,4 +102,19 @@ class BaseSeed extends Shell {
 
 		return $parser;
 	}
-} 
+
+/**
+ * Displays a simple progress report
+ *
+ * @param int $numberDone Number that has been completed
+ * @param int $totalNumber Total to complete
+ * @return void
+ */
+	protected function _displayProgress($numberDone, $totalNumber) {
+		$this->out(".", 0, Shell::QUIET);
+		if ($numberDone % 70 === 0) {
+			$percent = ceil(($numberDone / $totalNumber) * 100);
+			$this->out(" $numberDone / $totalNumber ({$percent}%)", 1, Shell::QUIET);
+		}
+	}
+}

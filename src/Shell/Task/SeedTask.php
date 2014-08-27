@@ -1,7 +1,7 @@
 <?php
-namespace DataSeeder\Console\Command\Task;
+namespace DataSeeder\Shell\Task;
 
-use Cake\Console\Command\Task\SimpleBakeTask;
+use Cake\Shell\Task\SimpleBakeTask;
 
 /**
  * Report shell command.

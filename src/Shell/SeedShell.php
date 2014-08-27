@@ -1,14 +1,12 @@
 <?php
-namespace DataSeeder\Console\Command;
+namespace DataSeeder\Shell;
 
 // Components used
 use Cake\Console\Shell;
-use Cake\Core\App;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
 use Cake\Datasource\ConnectionManager;
 use Cake\Utility\ConventionsTrait;
-use Cake\Utility\Folder;
 use Cake\Utility\Inflector;
 
 /**

@@ -6,7 +6,7 @@ use Cake\Console\Shell;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
 use Cake\Datasource\ConnectionManager;
-use Cake\Utility\ConventionsTrait;
+use Cake\Core\ConventionsTrait;
 use Cake\Utility\Inflector;
 
 /**

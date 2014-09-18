@@ -111,11 +111,13 @@ class BaseSeed extends Shell {
  * @param bool $fail Did the step fail?
  * @return void
  */
-	protected function _displayProgress($numberDone, $totalNumber, $fail = false) {
+	protected function _displayProgress($numberDone, $totalNumber = null, $fail = false) {
 		$this->out(!$fail ? '.' : '<error>F</error>', 0, Shell::QUIET);
-		if ($numberDone % 70 === 0) {
+		if ($numberDone % 70 === 0 && $totalNumber) {
 			$percent = ceil(($numberDone / $totalNumber) * 100);
 			$this->out(" $numberDone / $totalNumber ({$percent}%)", 1, Shell::QUIET);
+		} else {
+			$this->out(" $numberDone", 1, Shell::QUIET);
 		}
 	}
 }

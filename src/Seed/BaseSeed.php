@@ -2,6 +2,7 @@
 namespace DataSeeder\Seed;
 
 use Cake\Console\Shell;
+use Cake\ORM\Table;
 
 /**
  * Class BaseSeed
@@ -32,7 +33,7 @@ class BaseSeed extends Shell {
  *
  * @return void
  */
-	public function truncateTable(\Cake\ORM\Table $table) {
+	public function truncateTable(Table $table) {
 		$connection = $table->connection();
 		$schemaTable = new \Cake\Database\Schema\Table($table->table());
 		$sql = $schemaTable->truncateSql($connection);
@@ -116,7 +117,7 @@ class BaseSeed extends Shell {
 		if ($numberDone % 70 === 0 && $totalNumber) {
 			$percent = ceil(($numberDone / $totalNumber) * 100);
 			$this->out(" $numberDone / $totalNumber ({$percent}%)", 1, Shell::QUIET);
-		} else {
+		} elseif ($numberDone % 70 === 0) {
 			$this->out(" $numberDone", 1, Shell::QUIET);
 		}
 	}
